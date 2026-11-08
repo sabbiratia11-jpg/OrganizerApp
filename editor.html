@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; }
+  body { padding: 4px 16px 24px 16px; font-family: sans-serif; font-size: 16px; line-height: 1.55; }
+  #editor { outline: none; min-height: 85vh; word-wrap: break-word; overflow-wrap: anywhere; }
+  #editor:empty:before { content: attr(data-placeholder); opacity: .45; }
+  #editor img { max-width: 100%; height: auto; border-radius: 10px; margin: 6px 0; display: block; }
+  #editor img.sel { outline: 3px solid #6366F1; }
+  #editor h1 { font-size: 1.7em; margin: .4em 0; }
+  #editor ul, #editor ol { padding-left: 1.4em; margin: .3em 0; }
+</style>
+</head>
+<body>
+<div id="editor" contenteditable="true" data-placeholder="Write something…"></div>
+<script>
+var editor = document.getElementById('editor');
+var selected = null, dirty = false;
+
+editor.addEventListener('input', function () { dirty = true; });
+editor.addEventListener('click', function (e) {
+  selectImg(e.target && e.target.tagName === 'IMG' ? e.target : null);
+});
+
+function selectImg(img) {
+  if (selected) selected.classList.remove('sel');
+  selected = img;
+  if (img) img.classList.add('sel');
+  try { Android.onImageSelected(!!img); } catch (e) {}
+}
+function setTheme(bg, fg) { document.body.style.background = bg; document.body.style.color = fg; }
+function setContent(h) { editor.innerHTML = h; dirty = false; selectImg(null); }
+function cmd(n, v) {
+  document.execCommand('styleWithCSS', false, false);
+  document.execCommand(n, false, v || null);
+  dirty = true;
+}
+function setColor(c) {
+  document.execCommand('styleWithCSS', false, false);
+  if (!c) {
+    document.execCommand('foreColor', false, '#010203');
+    editor.querySelectorAll('font[color="#010203"]').forEach(function (f) { f.removeAttribute('color'); });
+    editor.querySelectorAll('[style]').forEach(function (s) { if (s.style.color === 'rgb(1, 2, 3)') s.style.color = ''; });
+  } else {
+    document.execCommand('foreColor', false, c);
+  }
+  dirty = true;
+}
+function setHighlight(c) {
+  document.execCommand('styleWithCSS', false, true);
+  if (!c) {
+    document.execCommand('hiliteColor', false, '#010203');
+    editor.querySelectorAll('[style]').forEach(function (s) {
+      if (s.style.backgroundColor === 'rgb(1, 2, 3)') s.style.backgroundColor = '';
+    });
+  } else {
+    document.execCommand('hiliteColor', false, c);
+  }
+  document.execCommand('styleWithCSS', false, false);
+  dirty = true;
+}
+function heading() {
+  var cur = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+  document.execCommand('formatBlock', false, cur === 'h1' ? 'p' : 'h1');
+  dirty = true;
+}
+function normal() {
+  document.execCommand('formatBlock', false, 'p');
+  document.execCommand('fontSize', false, '3');
+  dirty = true;
+}
+function changeSize(d) {
+  var v = parseInt(document.queryCommandValue('fontSize'), 10);
+  if (isNaN(v)) v = 3;
+  v = Math.max(1, Math.min(7, v + d));
+  document.execCommand('styleWithCSS', false, false);
+  document.execCommand('fontSize', false, String(v));
+  dirty = true;
+}
+function insertImage(src) {
+  editor.focus();
+  document.execCommand('insertHTML', false, '<img src="' + src + '" style="width:100%"><br>');
+  dirty = true;
+}
+function resizeImage(d) {
+  if (!selected) return;
+  var w = parseInt(selected.style.width || '100', 10);
+  w = Math.max(20, Math.min(100, w + d));
+  selected.style.width = w + '%';
+  dirty = true;
+}
+function deleteImage() {
+  if (!selected) return;
+  var img = selected;
+  selectImg(null);
+  img.remove();
+  dirty = true;
+}
+function getData() {
+  var c = editor.cloneNode(true);
+  c.querySelectorAll('img.sel').forEach(function (i) { i.classList.remove('sel'); });
+  return JSON.stringify({ html: c.innerHTML, text: editor.innerText, dirty: dirty });
+}
+function markClean() { dirty = false; }
+</script>
+</body>
+</html>
